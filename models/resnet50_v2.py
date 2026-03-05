@@ -1,5 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models, backend
+from tensorflow import keras
+
+# avoid Pylance/TensorFlow import resolution issues by using top-level keras
+layers = keras.layers
+models = keras.models
+backend = keras.backend
 
 def bottleneck_block_v2(x, filters, kernel_size=3, stride=1, conv_shortcut=False, name=None):
     """

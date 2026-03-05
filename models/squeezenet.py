@@ -1,5 +1,9 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow import keras
+
+# bring submodules into local names to keep static analysis happy
+layers = keras.layers
+models = keras.models
 
 def fire_module(x, squeeze, expand, name):
     """
