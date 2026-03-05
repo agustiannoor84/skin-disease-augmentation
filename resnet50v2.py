@@ -1,5 +1,9 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models, backend
+
+# use tf.keras submodules directly to avoid import warnings/undercurl
+layers = tf.keras.layers
+models = tf.keras.models
+backend = tf.keras.backend
 
 # --- KONFIGURASI GLOBAL ---
 # Menggunakan 'channels_last' (standar TensorFlow)
