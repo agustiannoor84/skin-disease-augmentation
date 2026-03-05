@@ -1,5 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models, backend
+from tensorflow import keras
+
+# top-level keras access for better static analysis
+layers = keras.layers
+models = keras.models
+backend = keras.backend
 
 def conv_block(x, filters, kernel_size=3, strides=1, activation=True, name=None):
     """Blok Konvolusi standar dengan BN dan SiLU."""
