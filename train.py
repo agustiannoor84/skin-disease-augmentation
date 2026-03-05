@@ -10,7 +10,7 @@ from pathlib import Path
 from models.squeezenet import build_squeezenet
 from models.mobilenet_v3 import build_mobilenet_v3_large
 from models.inception_v3 import build_inception_v3
-from resnet50v2 import build_resnet50_v2
+from models.resnet50v2 import build_resnet50_v2
 from models.efficientnetv2 import build_efficientnetv2_s
 
 def main(args):
