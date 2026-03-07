@@ -1,0 +1,8 @@
+# TensorFlow compatible versions for Python 3.8-3.11
+# Note: Python 3.14 is not supported by TensorFlow yet
+tensorflow>=2.13.0,<2.17.0
+numpy>=1.21.0,<1.27.0
+opencv-python>=4.5.0
+matplotlib>=3.5.0
+scikit-learn>=1.0.0
+pillow>=8.0.0
