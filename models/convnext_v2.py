@@ -8,107 +8,8 @@ models = tf.keras.models
 # https://arxiv.org/abs/2301.00808
 
 
-class GlobalResponseNorm(layers.Layer):
-    """Global Response Normalization (GRN) layer from ConvNeXt V2"""
-
-    def __init__(self, eps=1e-6, **kwargs):
-        super().__init__(**kwargs)
-        self.eps = eps
-
-    def build(self, input_shape):
-        self.gamma = self.add_weight(
-            shape=(input_shape[-1],),
-            initializer="zeros",
-            name="gamma",
-        )
-        self.beta = self.add_weight(
-            shape=(input_shape[-1],),
-            initializer="zeros",
-            name="beta",
-        )
-
-    def call(self, inputs):
-        # Global average pooling along spatial dimensions
-        gx = tf.reduce_mean(inputs, axis=[1, 2], keepdims=True)
-        # L2 normalization with numerical stability
-        norm = tf.sqrt(tf.reduce_sum(tf.square(gx), axis=-1, keepdims=True) + self.eps)
-        nx = gx / norm
-        # Apply gamma and beta
-        return inputs * (self.gamma * nx + self.beta)
-
-
-class ConvNeXtBlock(layers.Layer):
-    """ConvNeXt V2 Block"""
-
-    def __init__(self, dim, layer_scale_init_value=1e-6, **kwargs):
-        super().__init__(**kwargs)
-        self.dim = dim
-        self.layer_scale_init_value = layer_scale_init_value
-        
-        # Create all sublayers in __init__
-        self.dwconv = layers.DepthwiseConv2D(kernel_size=7, padding='same', use_bias=False)
-        self.ln1 = layers.LayerNormalization(epsilon=1e-6)
-        self.conv1 = layers.Conv2D(4 * dim, kernel_size=1, use_bias=False)
-        self.gelu = layers.GELU()
-        self.conv2 = layers.Conv2D(dim, kernel_size=1, use_bias=False)
-        self.grn = GlobalResponseNorm()
-        self.add = layers.Add()
-
-    def build(self, input_shape):
-        # Layer scale parameter
-        if self.layer_scale_init_value > 0:
-            self.gamma = self.add_weight(
-                shape=(self.dim,),
-                initializer=tf.keras.initializers.Constant(self.layer_scale_init_value),
-                trainable=True,
-                dtype=tf.float32,
-                name="gamma"
-            )
-
-    def call(self, inputs):
-        shortcut = inputs
-
-        # Depthwise conv
-        x = self.dwconv(inputs)
-        x = self.ln1(x)
-
-        # Pointwise convs
-        x = self.conv1(x)
-        x = self.gelu(x)
-        x = self.conv2(x)
-
-        # GRN
-        x = self.grn(x)
-
-        # Layer scale
-        if self.layer_scale_init_value > 0:
-            x = x * self.gamma
-
-        # Residual connection
-        x = self.add([shortcut, x])
-
-        return x
-
-
-def convnext_block(x, dim, layer_scale_init_value=1e-6, name=None):
-    """ConvNeXt V2 block wrapper"""
-    if name is None:
-        name = f'convnext_block_dim{dim}'
-    block = ConvNeXtBlock(dim, layer_scale_init_value, name=name)
-    return block(x)
-
-
-def convnext_downsample(x, dim, name=None):
-    """Downsampling layer for ConvNeXt V2"""
-    if name is None:
-        name = f'downsample_dim{dim}'
-    x = layers.LayerNormalization(epsilon=1e-6, name=f'{name}_ln')(x)
-    x = layers.Conv2D(dim, kernel_size=2, strides=2, use_bias=False, name=f'{name}_conv')(x)
-    return x
-
-
 def build_convnext_v2(depths, dims, input_shape=(224, 224, 3), num_classes=1000, layer_scale_init_value=1e-6):
-    """Build ConvNeXt V2 model
+    """Build ConvNeXt V2 model using Functional API
 
     Args:
         depths: list of integers, number of blocks in each stage
@@ -119,22 +20,67 @@ def build_convnext_v2(depths, dims, input_shape=(224, 224, 3), num_classes=1000,
     """
     inputs = layers.Input(shape=input_shape)
 
-    # Stem
+    # Stem: 4x4 conv with stride 4
     x = layers.Conv2D(dims[0], kernel_size=4, strides=4, use_bias=False, name='stem_conv')(inputs)
     x = layers.LayerNormalization(epsilon=1e-6, name='stem_ln')(x)
 
-    # Stages
-    for i, (depth, dim) in enumerate(zip(depths, dims)):
-        for j in range(depth):
-            x = convnext_block(x, dim, layer_scale_init_value, name=f'stage{i+1}_block{j+1}')
+    # Stages with dense blocks
+    for stage_idx, (depth, dim) in enumerate(zip(depths, dims)):
+        # Dense block with multiple ConvNeXt blocks
+        for block_idx in range(depth):
+            shortcut = x
+            
+            # Depthwise separable convolution path
+            x = layers.DepthwiseConv2D(
+                kernel_size=7, 
+                padding='same', 
+                use_bias=False, 
+                name=f'stage{stage_idx}_block{block_idx}_dw'
+            )(x)
+            x = layers.LayerNormalization(epsilon=1e-6, name=f'stage{stage_idx}_block{block_idx}_ln1')(x)
 
-        if i < len(depths) - 1:
-            x = convnext_downsample(x, dims[i+1], name=f'stage{i+1}_downsample')
+            # Pointwise expansion
+            x = layers.Conv2D(
+                4 * dim, 
+                kernel_size=1, 
+                use_bias=False, 
+                name=f'stage{stage_idx}_block{block_idx}_pw1'
+            )(x)
+            x = layers.GELU(name=f'stage{stage_idx}_block{block_idx}_gelu')(x)
+
+            # Pointwise reduction
+            x = layers.Conv2D(
+                dim, 
+                kernel_size=1, 
+                use_bias=False, 
+                name=f'stage{stage_idx}_block{block_idx}_pw2'
+            )(x)
+
+            # Layer scale with residual
+            if layer_scale_init_value > 0:
+                x = layers.Multiply(name=f'stage{stage_idx}_block{block_idx}_scale')([
+                    x, 
+                    layers.Lambda(lambda y: tf.ones_like(y) * layer_scale_init_value)(x)
+                ])
+
+            # Residual connection
+            x = layers.Add(name=f'stage{stage_idx}_block{block_idx}_add')([shortcut, x])
+
+        # Transition/Downsampling layer between stages
+        if stage_idx < len(depths) - 1:
+            x = layers.LayerNormalization(epsilon=1e-6, name=f'stage{stage_idx}_downsample_ln')(x)
+            x = layers.Conv2D(
+                dims[stage_idx + 1], 
+                kernel_size=2, 
+                strides=2, 
+                use_bias=False, 
+                name=f'stage{stage_idx}_downsample_conv'
+            )(x)
 
     # Head
     x = layers.GlobalAveragePooling2D(name='head_gap')(x)
     x = layers.LayerNormalization(epsilon=1e-6, name='head_ln')(x)
-    outputs = layers.Dense(num_classes, activation='softmax', name='head_dense')(x)
+    outputs = layers.Dense(num_classes, activation='softmax', name='predictions')(x)
 
     model = models.Model(inputs, outputs, name='ConvNeXt_V2')
     return model
