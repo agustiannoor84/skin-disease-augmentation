@@ -44,6 +44,15 @@ class ConvNeXtBlock(layers.Layer):
         super().__init__(**kwargs)
         self.dim = dim
         self.layer_scale_init_value = layer_scale_init_value
+        
+        # Create all sublayers in __init__
+        self.dwconv = layers.DepthwiseConv2D(kernel_size=7, padding='same', use_bias=False)
+        self.ln1 = layers.LayerNormalization(epsilon=1e-6)
+        self.conv1 = layers.Conv2D(4 * dim, kernel_size=1, use_bias=False)
+        self.gelu = layers.GELU()
+        self.conv2 = layers.Conv2D(dim, kernel_size=1, use_bias=False)
+        self.grn = GlobalResponseNorm()
+        self.add = layers.Add()
 
     def build(self, input_shape):
         # Layer scale parameter
@@ -60,38 +69,41 @@ class ConvNeXtBlock(layers.Layer):
         shortcut = inputs
 
         # Depthwise conv
-        x = layers.DepthwiseConv2D(kernel_size=7, padding='same', use_bias=False)(inputs)
-        x = layers.LayerNormalization(epsilon=1e-6)(x)
+        x = self.dwconv(inputs)
+        x = self.ln1(x)
 
         # Pointwise convs
-        x = layers.Conv2D(4 * self.dim, kernel_size=1, use_bias=False)(x)
-        x = layers.GELU()(x)
-
-        x = layers.Conv2D(self.dim, kernel_size=1, use_bias=False)(x)
+        x = self.conv1(x)
+        x = self.gelu(x)
+        x = self.conv2(x)
 
         # GRN
-        x = GlobalResponseNorm()(x)
+        x = self.grn(x)
 
         # Layer scale
         if self.layer_scale_init_value > 0:
             x = x * self.gamma
 
         # Residual connection
-        x = layers.Add()([shortcut, x])
+        x = self.add([shortcut, x])
 
         return x
 
 
 def convnext_block(x, dim, layer_scale_init_value=1e-6, name=None):
     """ConvNeXt V2 block wrapper"""
+    if name is None:
+        name = f'convnext_block_dim{dim}'
     block = ConvNeXtBlock(dim, layer_scale_init_value, name=name)
     return block(x)
 
 
 def convnext_downsample(x, dim, name=None):
     """Downsampling layer for ConvNeXt V2"""
-    x = layers.LayerNormalization(epsilon=1e-6, name=name + '_ln')(x)
-    x = layers.Conv2D(dim, kernel_size=2, strides=2, use_bias=False, name=name + '_downsample')(x)
+    if name is None:
+        name = f'downsample_dim{dim}'
+    x = layers.LayerNormalization(epsilon=1e-6, name=f'{name}_ln')(x)
+    x = layers.Conv2D(dim, kernel_size=2, strides=2, use_bias=False, name=f'{name}_conv')(x)
     return x
 
 
