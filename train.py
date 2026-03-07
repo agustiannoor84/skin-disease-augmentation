@@ -12,6 +12,7 @@ from models.mobilenet_v3 import build_mobilenet_v3_large
 from models.inception_v3 import build_inception_v3
 from models.resnet50v2 import build_resnet50_v2
 from models.efficientnetv2 import build_efficientnetv2_s
+from models.densenet import build_densenet121, build_densenet169, build_densenet201, build_densenet264
 
 def main(args):
     # 1. Tentukan Input Shape & Fungsi Pembangun Berdasarkan Pilihan Model
@@ -32,6 +33,20 @@ def main(args):
     elif model_type == 'efficientnetv2':
         input_shape = (224, 224, 3)
         build_fn = build_efficientnetv2_s
+    elif model_type.startswith('densenet'):
+        input_shape = (224, 224, 3)
+        # select variant based on suffix
+        if model_type == 'densenet121':
+            build_fn = build_densenet121
+        elif model_type == 'densenet169':
+            build_fn = build_densenet169
+        elif model_type == 'densenet201':
+            build_fn = build_densenet201
+        elif model_type == 'densenet264':
+            build_fn = build_densenet264
+        else:
+            print(f"Error: DenseNet variant '{model_type}' tidak dikenali.")
+            return
     else:
         print(f"Error: Model tipe '{model_type}' tidak didukung.")
         return
@@ -95,8 +110,9 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Script Pelatihan Dinamis Multisistem")
     parser.add_argument("--model_type", type=str, default="resnet50v2", 
-                        choices=['squeezenet', 'mobilenetv3', 'inceptionv3', 'resnet50v2', 'efficientnetv2'],
-                        help="Jenis arsitektur (squeezenet/mobilenetv3/inceptionv3/resnet50v2/efficientnetv2)")
+                        choices=['squeezenet', 'mobilenetv3', 'inceptionv3', 'resnet50v2', 'efficientnetv2',
+                                 'densenet121','densenet169','densenet201','densenet264'],
+                        help="Jenis arsitektur (squeezenet/mobilenetv3/inceptionv3/resnet50v2/efficientnetv2/densenetXXX)")
     parser.add_argument("--data_dir", type=str, default=str(base_dir / "data" / "processed"), help="Folder dataset yang sudah digodok")
     parser.add_argument("--epochs", type=int, default=10, help="Jumlah total penggulangan")
     parser.add_argument("--batch_size", type=int, default=32, help="Jumlah foto tiap batch")
