@@ -1,5 +1,14 @@
+import os
+import warnings
+
+warnings.filterwarnings('ignore')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
-from tensorflow.keras import layers, models
+
+# Use tf.keras submodules directly so the language server can resolve them
+layers = tf.keras.layers
+models = tf.keras.models
 
 # DenseNet implementation adapted from "Densely Connected Convolutional Networks"
 # https://arxiv.org/abs/1608.06993
@@ -55,9 +64,9 @@ def build_densenet(blocks, input_shape=(224, 224, 3), num_classes=1000, growth_r
     inputs = layers.Input(shape=input_shape)
 
     # Initial convolution
-    x = layers.Conv2D(64, 7, strides=2, padding='same', use_bias=False, name='conv1/conv')(inputs)
-    x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
-    x = layers.Activation('relu', name='conv1/relu')(x)
+    x = layers.Conv2D(64, 7, strides=2, padding='same', use_bias=False, name='conv1_conv')(inputs)
+    x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5, name='conv1_bn')(x)
+    x = layers.Activation('relu', name='conv1_relu')(x)
     x = layers.MaxPooling2D(3, strides=2, padding='same', name='pool1')(x)
 
     # Dense blocks with transition layers

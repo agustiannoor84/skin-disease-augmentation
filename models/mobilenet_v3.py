@@ -1,10 +1,15 @@
+import os
+import warnings
+
+warnings.filterwarnings('ignore')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
-from tensorflow import keras
 
 # TensorFlow's submodules sometimes confuse static analyzers like Pylance.
-# Importing via the top-level keras module avoids "could not be resolved" warnings.
-layers = keras.layers
-models = keras.models
+# Use the full path to avoid "could not be resolved" warnings.
+layers = tf.keras.layers
+models = tf.keras.models
 
 def build_mobilenet_v3_large(input_shape=(224, 224, 3), num_classes=1000):
     """

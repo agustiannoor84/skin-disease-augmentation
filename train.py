@@ -1,5 +1,11 @@
 import os
+import warnings
 import argparse
+
+# Suppress TensorFlow dtype warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
 from utils.data_processing import load_and_preprocess_dataset
