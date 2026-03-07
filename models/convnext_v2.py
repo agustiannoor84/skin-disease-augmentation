@@ -30,8 +30,9 @@ class GlobalResponseNorm(layers.Layer):
     def call(self, inputs):
         # Global average pooling along spatial dimensions
         gx = tf.reduce_mean(inputs, axis=[1, 2], keepdims=True)
-        # L2 normalization
-        nx = tf.norm(gx, ord=2, axis=-1, keepdims=True) / self.eps
+        # L2 normalization with numerical stability
+        norm = tf.sqrt(tf.reduce_sum(tf.square(gx), axis=-1, keepdims=True) + self.eps)
+        nx = gx / norm
         # Apply gamma and beta
         return inputs * (self.gamma * nx + self.beta)
 
@@ -51,6 +52,7 @@ class ConvNeXtBlock(layers.Layer):
                 shape=(self.dim,),
                 initializer=tf.keras.initializers.Constant(self.layer_scale_init_value),
                 trainable=True,
+                dtype=tf.float32,
                 name="gamma"
             )
 
