@@ -1,5 +1,10 @@
 import os
 import argparse
+import os
+import warnings
+warnings.filterwarnings('ignore')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
 from models.mobilenet_v3 import build_mobilenet_v3_large
 from utils.data_processing import load_and_preprocess_dataset

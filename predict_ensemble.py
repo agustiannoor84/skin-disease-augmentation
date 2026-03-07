@@ -1,6 +1,11 @@
 import os
 import argparse
 import numpy as np
+import os
+import warnings
+warnings.filterwarnings('ignore')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
 import cv2
 from pathlib import Path
